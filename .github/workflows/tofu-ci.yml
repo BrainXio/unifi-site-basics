@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - next
+    tags:
+      - '*'
   pull_request:
     branches:
       - main
@@ -15,29 +17,45 @@ permissions:
   pull-requests: write
 
 jobs:
-  detect-tf-files:
+  router:
     runs-on: ubuntu-latest
-    name: Check for Terraform files
+    name: Determine workflow path
     outputs:
-      has_tf_files: ${{ steps.check.outputs.has_tf_files }}
+      has_tf_files: ${{ steps.detect.outputs.has_tf_files }}
+      run_checks: ${{ steps.logic.outputs.run_checks }}
+      run_docs: ${{ steps.logic.outputs.run_docs }}
+      target_ref: ${{ steps.logic.outputs.target_ref }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Detect .tf / .tofu files
-        id: check
+      - id: detect
         run: |
           if find . -type f \( -name "*.tf" -o -name "*.tofu" \) -not -path "./.git/*" -print -quit | grep -q .; then
             echo "has_tf_files=true" >> "$GITHUB_OUTPUT"
-            echo "Terraform/OpenTofu files found → proceeding"
           else
             echo "has_tf_files=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No .tf or .tofu files found → skipping checks"
+          fi
+
+      - id: logic
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "run_checks=true" >> "$GITHUB_OUTPUT"
+            echo "run_docs=false" >> "$GITHUB_OUTPUT"
+            echo "target_ref=" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "run_checks=true" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.ref }}" == refs/heads/next || "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" =~ ^refs/tags/ ]]; then
+              echo "run_docs=true" >> "$GITHUB_OUTPUT"
+              echo "target_ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            else
+              echo "run_docs=false" >> "$GITHUB_OUTPUT"
+              echo "target_ref=" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   fmt:
-    needs: detect-tf-files
-    if: ${{ needs.detect-tf-files.outputs.has_tf_files == 'true' }}
+    needs: router
+    if: ${{ needs.router.outputs.run_checks == 'true' && needs.router.outputs.has_tf_files == 'true' }}
     runs-on: ubuntu-latest
     name: Format Check
     steps:
@@ -54,8 +72,8 @@ jobs:
         run: tofu fmt -check
 
   validate:
-    needs: detect-tf-files
-    if: ${{ needs.detect-tf-files.outputs.has_tf_files == 'true' }}
+    needs: router
+    if: ${{ needs.router.outputs.run_checks == 'true' && needs.router.outputs.has_tf_files == 'true' }}
     runs-on: ubuntu-latest
     name: Validate Configuration
     steps:
@@ -75,8 +93,8 @@ jobs:
         run: tofu validate
 
   pr-comment:
-    needs: [detect-tf-files, fmt, validate]
-    if: github.event_name == 'pull_request'
+    needs: [router, fmt, validate]
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     name: PR Comment
     steps:
@@ -88,9 +106,8 @@ jobs:
           comment-author: 'github-actions[bot]'
           body-includes: 'OpenTofu/Terraform Validation Status'
 
-      # ── Case 1: No .tf files ───────────────────────────────────────────────
-      - name: Comment - No .tf files
-        if: needs.detect-tf-files.outputs.has_tf_files == 'false'
+      - name: Post/Update comment - No .tf files
+        if: needs.router.outputs.has_tf_files == 'false'
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -101,7 +118,7 @@ jobs:
             **No `.tf` or `.tofu` files detected in this PR.**
 
             No formatting or validation checks were run.
-            If this is unexpected, verify file names and commits.
+            If this is unexpected, verify that your configuration files are correctly named and committed.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
@@ -109,7 +126,7 @@ jobs:
 
       - name: Post/Update comment - All checks passed
         if: >-
-          needs.detect-tf-files.outputs.has_tf_files == 'true' && needs.fmt.result == 'success' && needs.validate.result == 'success'
+          needs.router.outputs.has_tf_files == 'true' && needs.fmt.result == 'success' && needs.validate.result == 'success'
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -130,7 +147,7 @@ jobs:
 
       - name: Post/Update comment - One or more checks failed
         if: >-
-          needs.detect-tf-files.outputs.has_tf_files == 'true' && (needs.fmt.result != 'success' || needs.validate.result != 'success')
+          needs.router.outputs.has_tf_files == 'true' && (needs.fmt.result != 'success' || needs.validate.result != 'success')
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -150,22 +167,17 @@ jobs:
           reactions: confused
 
   generate-docs:
-    needs: detect-tf-files
-    if: >-
-      github.event_name == 'push' && needs.detect-tf-files.outputs.has_tf_files == 'true' && (
-        github.ref == 'refs/heads/next' ||
-        github.ref == 'refs/heads/main' ||
-        startsWith(github.ref, 'refs/tags/')
-      )
+    needs: router
+    if: ${{ needs.router.outputs.run_docs == 'true' }}
     runs-on: ubuntu-latest
     name: Generate & Commit README Docs
     permissions:
       contents: write
     steps:
-      - name: Checkout next branch (full history)
+      - name: Checkout ref (full history)
         uses: actions/checkout@v6
         with:
-          ref: next
+          ref: ${{ needs.router.outputs.target_ref }}
           fetch-depth: 0
 
       - name: Setup OpenTofu
@@ -198,6 +210,6 @@ jobs:
             echo "No documentation changes detected"
           else
             git commit -m "chore(docs): auto-update README with latest terraform-docs [ci skip]"
-            git push origin HEAD:next
-            echo "README/docs committed and pushed to next"
+            git push origin HEAD:${{ needs.router.outputs.target_ref }}
+            echo "README/docs committed and pushed"
           fi
