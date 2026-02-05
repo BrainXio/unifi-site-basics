@@ -20,7 +20,7 @@ jobs:
       has_tf_files: ${{ steps.check.outputs.has_tf_files }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Detect .tf / .tofu files
         id: check
@@ -40,7 +40,7 @@ jobs:
     name: Format Check
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v1
@@ -58,7 +58,7 @@ jobs:
     name: Validate Configuration
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v1
