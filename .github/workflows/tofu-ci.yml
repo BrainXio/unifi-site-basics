@@ -74,19 +74,20 @@ jobs:
 
   pr-comment:
     needs: [detect-tf-files, fmt, validate]
-    if: ${{ github.event_name == 'pull_request' }}
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     name: PR Comment
     steps:
       - name: Find existing comment
         id: find_comment
-        uses: peter-evans/find-comment@v4
+        uses: peter-evans/find-comment@v3
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: 'github-actions[bot]'
           body-includes: 'OpenTofu/Terraform Validation Status'
 
-      - name: Post/Update comment - No .tf files
+      # ── Case 1: No .tf files ───────────────────────────────────────────────
+      - name: Comment - No .tf files
         if: needs.detect-tf-files.outputs.has_tf_files == 'false'
         uses: peter-evans/create-or-update-comment@v5
         with:
@@ -98,14 +99,16 @@ jobs:
             **No `.tf` or `.tofu` files detected in this PR.**
 
             No formatting or validation checks were run.
-            If this is unexpected, please verify that your configuration files are correctly named and committed.
+            If this is unexpected, verify file names and commits.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
           reactions: eyes
 
-      - name: Post/Update comment - All checks passed
-        if: needs.detect-tf-files.outputs.has_tf_files == 'true' && jobs.fmt.result == 'success' && jobs.validate.result == 'success'
+      # ── Case 2: All checks passed ───────────────────────────────────────────
+      - name: Comment - All passed
+        if: >-
+          needs.detect-tf-files.outputs.has_tf_files == 'true' && needs.fmt.result == 'success' && needs.validate.result == 'success'
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -118,14 +121,16 @@ jobs:
             - `tofu fmt -check`: Passed
             - `tofu validate`: Passed
 
-            Configuration is well-formatted and syntactically valid.
+            Configuration looks good.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
           reactions: rocket
 
-      - name: Post/Update comment - One or more checks failed
-        if: needs.detect-tf-files.outputs.has_tf_files == 'true' && (jobs.fmt.result != 'success' || jobs.validate.result != 'success')
+      # ── Case 3: One or more failures ────────────────────────────────────────
+      - name: Comment - Failure
+        if: >-
+          needs.detect-tf-files.outputs.has_tf_files == 'true' && (needs.fmt.result != 'success' || needs.validate.result != 'success')
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -135,10 +140,10 @@ jobs:
 
             **One or more checks failed.**
 
-            - **Format check** (`tofu fmt -check`): ${{ jobs.fmt.result == 'success' && 'Passed' || 'Failed' }}
-            - **Validation** (`tofu validate`): ${{ jobs.validate.result == 'success' && 'Passed' || 'Failed' }}
+            - **Format check** (`tofu fmt -check`): ${{ needs.fmt.result == 'success' && 'Passed' || 'Failed' }}
+            - **Validation** (`tofu validate`): ${{ needs.validate.result == 'success' && 'Passed' || 'Failed' }}
 
-            Please review the workflow logs for details and fix the issues.
+            Check the workflow logs for details.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
