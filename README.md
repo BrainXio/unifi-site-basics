@@ -154,7 +154,7 @@ module "unifi_site_basics" {
 
 ```hcl
 module "unifi_site_basics" {
-  source = "./basic-config"  # or git source
+  source = "git::https://github.com/BrainXio/unifi-site-basics.git?ref=next"
 
   lan_network_name = "Default"
 
@@ -205,6 +205,6 @@ All features can be toggled independently — defaults aim for "sensible & secur
 </p>
 
 <p align="center" style="font-size: 0.9em; color: #666;">
-  Generated on 2026-02-05 23:11:42 UTC
+  Generated on 2026-02-05 23:30:16 UTC
 </p>
 <!-- END_TF_DOCS -->
