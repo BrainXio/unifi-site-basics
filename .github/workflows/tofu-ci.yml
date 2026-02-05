@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - main
+      - next
   pull_request:
     branches:
       - main
+      - next
 
 permissions:
   contents: read
-  pull-requests: write # needed for commenting on PRs
+  pull-requests: write
 
 jobs:
   detect-tf-files:
@@ -98,14 +100,15 @@ jobs:
             **No `.tf` or `.tofu` files detected in this PR.**
 
             No formatting or validation checks were run.
-            If this is unexpected, please verify that your configuration files are correctly named and committed.
+            If this is unexpected, verify that your configuration files are correctly named and committed.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
           reactions: eyes
 
       - name: Post/Update comment - All checks passed
-        if: needs.detect-tf-files.outputs.has_tf_files == 'true' && jobs.fmt.result == 'success' && jobs.validate.result == 'success'
+        if: >-
+          needs.detect-tf-files.outputs.has_tf_files == 'true' && needs.fmt.result == 'success' && needs.validate.result == 'success'
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -125,7 +128,8 @@ jobs:
           reactions: rocket
 
       - name: Post/Update comment - One or more checks failed
-        if: needs.detect-tf-files.outputs.has_tf_files == 'true' && (jobs.fmt.result != 'success' || jobs.validate.result != 'success')
+        if: >-
+          needs.detect-tf-files.outputs.has_tf_files == 'true' && (needs.fmt.result != 'success' || needs.validate.result != 'success')
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -135,11 +139,50 @@ jobs:
 
             **One or more checks failed.**
 
-            - **Format check** (`tofu fmt -check`): ${{ jobs.fmt.result == 'success' && 'Passed' || 'Failed' }}
-            - **Validation** (`tofu validate`): ${{ jobs.validate.result == 'success' && 'Passed' || 'Failed' }}
+            - **Format check** (`tofu fmt -check`): ${{ needs.fmt.result == 'success' && 'Passed' || 'Failed' }}
+            - **Validation** (`tofu validate`): ${{ needs.validate.result == 'success' && 'Passed' || 'Failed' }}
 
             Please review the workflow logs for details and fix the issues.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
           reactions: confused
+
+  generate-docs:
+    needs: detect-tf-files
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' && needs.detect-tf-files.outputs.has_tf_files == 'true' }}
+    runs-on: ubuntu-latest
+    name: Generate & Commit README Docs
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout next branch (full history)
+        uses: actions/checkout@v6
+        with:
+          ref: next
+          fetch-depth: 0
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: '~1.11.0'
+          tofu_wrapper: false
+
+      - name: Generate docs with site-docs.sh
+        run: ./scripts/site-docs.sh --make
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Commit and push if docs changed
+        run: |-
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md site/  # adjust if your script outputs to different paths
+          if git diff --staged --quiet; then
+            echo "No documentation changes detected"
+          else
+            git commit -m "chore(docs): auto-update README with latest terraform-docs [ci skip]"
+            git push origin HEAD:next
+            echo "README/docs committed and pushed to next"
+          fi
