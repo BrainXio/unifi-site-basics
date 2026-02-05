@@ -205,6 +205,6 @@ All features can be toggled independently — defaults aim for "sensible & secur
 </p>
 
 <p align="center" style="font-size: 0.9em; color: #666;">
-  Generated on 2026-02-05 22:59:24 UTC
+  Generated on 2026-02-05 23:11:42 UTC
 </p>
 <!-- END_TF_DOCS -->
