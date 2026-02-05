@@ -36,7 +36,7 @@ module "unifi_site_basics" {
 
 ```hcl
 module "unifi_site_basics" {
-  source = "./basic-config"  # or git source
+  source = "git::https://github.com/${GITHUB_REPOSITORY}.git?ref=${REF}"
 
   lan_network_name = "Default"
 
