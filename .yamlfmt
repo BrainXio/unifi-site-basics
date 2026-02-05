@@ -1,0 +1,6 @@
+# .yamlfmt
+formatter:
+  indent: 2
+  linewidth: 120
+  trim_trailing_whitespace: true
+  retain_line_breaks_single: true

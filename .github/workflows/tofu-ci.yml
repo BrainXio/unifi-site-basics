@@ -1,0 +1,145 @@
+name: Terraform / OpenTofu Basics
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write # needed for commenting on PRs
+
+jobs:
+  detect-tf-files:
+    runs-on: ubuntu-latest
+    name: Check for Terraform files
+    outputs:
+      has_tf_files: ${{ steps.check.outputs.has_tf_files }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect .tf / .tofu files
+        id: check
+        run: |
+          if find . -type f \( -name "*.tf" -o -name "*.tofu" \) -not -path "./.git/*" -print -quit | grep -q .; then
+            echo "has_tf_files=true" >> "$GITHUB_OUTPUT"
+            echo "Terraform/OpenTofu files found → proceeding"
+          else
+            echo "has_tf_files=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No .tf or .tofu files found → skipping checks"
+          fi
+
+  fmt:
+    needs: detect-tf-files
+    if: ${{ needs.detect-tf-files.outputs.has_tf_files == 'true' }}
+    runs-on: ubuntu-latest
+    name: Format Check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: '~1.11.0'
+          tofu_wrapper: false
+
+      - name: Check formatting
+        run: tofu fmt -check
+
+  validate:
+    needs: detect-tf-files
+    if: ${{ needs.detect-tf-files.outputs.has_tf_files == 'true' }}
+    runs-on: ubuntu-latest
+    name: Validate Configuration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: '~1.11.0'
+          tofu_wrapper: false
+
+      - name: Initialize (no backend)
+        run: tofu init -backend=false
+
+      - name: Validate
+        run: tofu validate
+
+  pr-comment:
+    needs: [detect-tf-files, fmt, validate]
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    name: PR Comment
+    steps:
+      - name: Find existing comment
+        id: find_comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'OpenTofu/Terraform Validation Status'
+
+      - name: Post/Update comment - No .tf files
+        if: needs.detect-tf-files.outputs.has_tf_files == 'false'
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### OpenTofu/Terraform Validation Status
+
+            **No `.tf` or `.tofu` files detected in this PR.**
+
+            No formatting or validation checks were run.
+            If this is unexpected, please verify that your configuration files are correctly named and committed.
+
+            *Triggered by @${{ github.actor }}*
+          edit-mode: replace
+          reactions: eyes
+
+      - name: Post/Update comment - All checks passed
+        if: needs.detect-tf-files.outputs.has_tf_files == 'true' && jobs.fmt.result == 'success' && jobs.validate.result == 'success'
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### OpenTofu/Terraform Validation Status ✅
+
+            **All checks passed!**
+
+            - `tofu fmt -check`: Passed
+            - `tofu validate`: Passed
+
+            Configuration is well-formatted and syntactically valid.
+
+            *Triggered by @${{ github.actor }}*
+          edit-mode: replace
+          reactions: rocket
+
+      - name: Post/Update comment - One or more checks failed
+        if: needs.detect-tf-files.outputs.has_tf_files == 'true' && (jobs.fmt.result != 'success' || jobs.validate.result != 'success')
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### OpenTofu/Terraform Validation Status ❌
+
+            **One or more checks failed.**
+
+            - **Format check** (`tofu fmt -check`): ${{ jobs.fmt.result == 'success' && 'Passed' || 'Failed' }}
+            - **Validation** (`tofu validate`): ${{ jobs.validate.result == 'success' && 'Passed' || 'Failed' }}
+
+            Please review the workflow logs for details and fix the issues.
+
+            *Triggered by @${{ github.actor }}*
+          edit-mode: replace
+          reactions: confused
