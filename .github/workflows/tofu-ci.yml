@@ -151,7 +151,12 @@ jobs:
 
   generate-docs:
     needs: detect-tf-files
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' && needs.detect-tf-files.outputs.has_tf_files == 'true' }}
+    if: >-
+      github.event_name == 'push' && needs.detect-tf-files.outputs.has_tf_files == 'true' && (
+        github.ref == 'refs/heads/next' ||
+        github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/tags/')
+      )
     runs-on: ubuntu-latest
     name: Generate & Commit README Docs
     permissions:
@@ -169,6 +174,15 @@ jobs:
           tofu_version: '~1.11.0'
           tofu_wrapper: false
 
+      - name: Install terraform-docs
+        run: |
+          TERRAFORM_DOCS_VERSION="v0.20.0"
+          curl -sSL https://github.com/terraform-docs/terraform-docs/releases/download/${TERRAFORM_DOCS_VERSION}/terraform-docs-${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz | \
+            tar -xz terraform-docs
+          chmod +x terraform-docs
+          sudo mv terraform-docs /usr/local/bin/
+          terraform-docs --version
+
       - name: Generate docs with site-docs.sh
         run: ./scripts/site-docs.sh --make
         env:
@@ -179,7 +193,7 @@ jobs:
         run: |-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md site/  # adjust if your script outputs to different paths
+          git add README.md
           if git diff --staged --quiet; then
             echo "No documentation changes detected"
           else
