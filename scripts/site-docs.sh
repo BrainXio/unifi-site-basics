@@ -42,16 +42,16 @@ done
 echo "=== site-docs.sh — README Refresh ==="
 
 # ── Resolve dynamic values ──
-if [[ -n "${GITHUB_ACTOR:-}" ]]; then
-  ACTOR="$GITHUB_ACTOR"
+if [[ -n "${GITHUB_OWNER:-}" ]]; then
+  OWNER="$GITHUB_OWNER"
 else
-  ACTOR="$(git config user.name 2>/dev/null || echo "github-actor")"
+  OWNER="$(git config user.name 2>/dev/null || echo "github-actor")"
 fi
 
 if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
   REPO="$GITHUB_REPOSITORY"
 else
-  REPO="${ACTOR}/$(basename "$PWD")"
+  REPO="${OWNER}/$(basename "$PWD")"
 fi
 
 # ── Determine REF (for ?ref= in module source examples) ──
@@ -93,7 +93,7 @@ else
     fi
 fi
 
-export GITHUB_ACTOR="$ACTOR"
+export GITHUB_OWNER="$OWNER"
 export GITHUB_REPOSITORY="$REPO"
 export PROJECT_TITLE="$(basename "$PWD")"
 export GENERATION_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
