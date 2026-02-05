@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/${GITHUB_REPOSITORY}/">
-    <img src="https://github.com/${GITHUB_OWNER}.png" alt="Logo" width=72 height=72>
+    <img src="https://github.com/${GITHUB_REPOSITORY_OWNER}.png" alt="Logo" width=72 height=72>
   </a>
 
   <p align="center" style="font-size: 1.1em; font-style: italic;">

@@ -42,8 +42,8 @@ done
 echo "=== site-docs.sh — README Refresh ==="
 
 # ── Resolve dynamic values ──
-if [[ -n "${GITHUB_OWNER:-}" ]]; then
-  OWNER="$GITHUB_OWNER"
+if [[ -n "${GITHUB_REPOSITORY_OWNER:-}" ]]; then
+  OWNER="$GITHUB_REPOSITORY_OWNER"
 else
   OWNER="$(git config user.name 2>/dev/null || echo "github-actor")"
 fi
@@ -93,7 +93,7 @@ else
     fi
 fi
 
-export GITHUB_OWNER="$OWNER"
+export GITHUB_REPOSITORY_OWNER="$OWNER"
 export GITHUB_REPOSITORY="$REPO"
 export PROJECT_TITLE="$(basename "$PWD")"
 export GENERATION_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
