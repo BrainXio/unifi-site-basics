@@ -76,19 +76,20 @@ jobs:
 
   pr-comment:
     needs: [detect-tf-files, fmt, validate]
-    if: ${{ github.event_name == 'pull_request' }}
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     name: PR Comment
     steps:
       - name: Find existing comment
         id: find_comment
-        uses: peter-evans/find-comment@v4
+        uses: peter-evans/find-comment@v3
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: 'github-actions[bot]'
           body-includes: 'OpenTofu/Terraform Validation Status'
 
-      - name: Post/Update comment - No .tf files
+      # ── Case 1: No .tf files ───────────────────────────────────────────────
+      - name: Comment - No .tf files
         if: needs.detect-tf-files.outputs.has_tf_files == 'false'
         uses: peter-evans/create-or-update-comment@v5
         with:
@@ -100,7 +101,7 @@ jobs:
             **No `.tf` or `.tofu` files detected in this PR.**
 
             No formatting or validation checks were run.
-            If this is unexpected, verify that your configuration files are correctly named and committed.
+            If this is unexpected, verify file names and commits.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
@@ -121,7 +122,7 @@ jobs:
             - `tofu fmt -check`: Passed
             - `tofu validate`: Passed
 
-            Configuration is well-formatted and syntactically valid.
+            Configuration looks good.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
@@ -142,7 +143,7 @@ jobs:
             - **Format check** (`tofu fmt -check`): ${{ needs.fmt.result == 'success' && 'Passed' || 'Failed' }}
             - **Validation** (`tofu validate`): ${{ needs.validate.result == 'success' && 'Passed' || 'Failed' }}
 
-            Please review the workflow logs for details and fix the issues.
+            Check the workflow logs for details.
 
             *Triggered by @${{ github.actor }}*
           edit-mode: replace
