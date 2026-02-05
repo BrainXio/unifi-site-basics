@@ -3,7 +3,7 @@
 
 <p align="center">
   <a href="https://github.com/BrainXio/unifi-site-basics/">
-    <img src="https://github.com/mrrobot0985.png" alt="Logo" width=72 height=72>
+    <img src="https://github.com/BrainXio.png" alt="Logo" width=72 height=72>
   </a>
 
   <p align="center" style="font-size: 1.1em; font-style: italic;">
@@ -205,6 +205,6 @@ All features can be toggled independently — defaults aim for "sensible & secur
 </p>
 
 <p align="center" style="font-size: 0.9em; color: #666;">
-  Generated on 2026-02-05 22:52:33 UTC
+  Generated on 2026-02-05 22:59:24 UTC
 </p>
 <!-- END_TF_DOCS -->
