@@ -170,7 +170,13 @@ jobs:
           tofu_wrapper: false
 
       - name: Install terraform-docs
-        uses: lablabs/setup-terraform-docs@v1
+        run: |
+          TERRAFORM_DOCS_VERSION="v0.20.0"
+          curl -sSL https://github.com/terraform-docs/terraform-docs/releases/download/${TERRAFORM_DOCS_VERSION}/terraform-docs-${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz | \
+            tar -xz terraform-docs
+          chmod +x terraform-docs
+          sudo mv terraform-docs /usr/local/bin/
+          terraform-docs --version
 
       - name: Generate docs with site-docs.sh
         run: ./scripts/site-docs.sh --make
