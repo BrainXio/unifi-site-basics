@@ -38,6 +38,10 @@ repos:
     hooks:
       - id: terraform_fmt
       - id: terraform_validate
+        args:
+          - --tf-init-args=-backend=false # crucial for examples/modules (no state/backend)
+          - --tf-init-args=-upgrade # optional: always get fresh providers
+          - --hook-config=--retry-once-with-cleanup=true
       - id: terraform_tflint
       - id: terraform_trivy
       - id: terraform_providers_lock
